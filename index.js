@@ -114,7 +114,7 @@ class DungeonBreakerExtras {
     });
     if (!block) return;
     if (!Player.getHeldItem()?.getName()?.includes("Dungeonbreaker")) {
-      Player.setHeldItemIndex(1);
+      //Player.setHeldItemIndex(1);
       return;
     }
     this.minedBlocks.set(block.join(","), Date.now());
