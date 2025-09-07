@@ -1,0 +1,7 @@
+{
+  "name": "DungeonBreakerExtras",
+  "creator": "rdbt",
+  "entry": "index.js",
+  "version": "0.0.1",
+  "requires": ["tska", "PogData"]
+}
