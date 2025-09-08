@@ -66,9 +66,10 @@ class DungeonBreakerExtras {
     } else {
       this.detectedRoom = DungeonScanner.getCurrentRoom();
     }
-    if (!this.detectedRoom) {
+    // Timeout is incase detection fails somehow 
+    if (!this.detectedRoom || !this.detectedRoom.corner) {
       this.timeout++;
-      if (this.timeout > 10) {
+      if (this.timeout > 5) {
         this.currentRoom = null;
         this.worldBlocks = [];
       }
