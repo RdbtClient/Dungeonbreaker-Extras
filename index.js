@@ -8,7 +8,7 @@ import Location from "../tska/skyblock/Location";
 import Dungeon from "../tska/skyblock/dungeon/Dungeon";
 import PogObject from "../PogData";
 import settings from "./settings";
-import { nukeBlock, closestEnumFacing, worldToRelative, relativeToWorld } from "./utils.js";
+import { nukeBlock, closestEnumFacing, worldToRelative, relativeToWorld, findItemInHotbar, setItemSlot } from "./utils.js";
 const offset = 0.01; // idk how to fix zfighting in apelles so fuck it
 const Vec3 = Java.type("net.minecraft.util.Vec3");
 const BP = Java.type("net.minecraft.util.BlockPos");
@@ -22,7 +22,6 @@ class DungeonBreakerExtras {
   constructor() {
     this.BLOCK_COOLDOWN = 1000;
 
-    this.currentRoom = null;
     this.inDungeon = false;
     this.editMode = false;
     this.timeout = 0;
@@ -34,8 +33,8 @@ class DungeonBreakerExtras {
 
     this.nukeBlock = nukeBlock;
     this.closestEnumFacing = closestEnumFacing;
-    this.worldToRelative = (worldCoords) => worldToRelative(worldCoords, this.currentRoom);
-    this.relativeToWorld = (relativeCoords) => relativeToWorld(relativeCoords, this.currentRoom);
+    this.worldToRelative = (worldCoords) => worldToRelative(worldCoords, this.detectedRoom);
+    this.relativeToWorld = (relativeCoords) => relativeToWorld(relativeCoords, this.detectedRoom);
 
     register("tick", () => this.handleRoomTick());
     register("tick", () => this.handleNukerTick());
@@ -67,23 +66,25 @@ class DungeonBreakerExtras {
     } else {
       this.detectedRoom = DungeonScanner.getCurrentRoom();
     }
-    // Timeout is incase detection fails somehow 
+
+    // Timeout is incase detection fails somehow
     if (!this.detectedRoom || !this.detectedRoom.corner) {
       this.timeout++;
       if (this.timeout > 5) {
-        this.currentRoom = null;
+        this.detectedRoom = null;
         this.worldBlocks = [];
       }
       return;
     }
     this.timeout = 0;
-    if (Location.area !== "Catacombs") return this.inDungeon = false;
+
+    if (Location.area !== "Catacombs") return (this.inDungeon = false);
     this.inDungeon = true;
+
     this.detectedRoom.corner = this.detectedRoom.corner.map(Math.floor);
-    this.currentRoom = this.detectedRoom;
     this.worldBlocks = [];
-    if (this.roomBlockData.roomBlocks[this.currentRoom.name]) {
-      this.roomBlockData.roomBlocks[this.currentRoom.name].forEach((block) => {
+    if (this.roomBlockData.roomBlocks[this.detectedRoom.name]) {
+      this.roomBlockData.roomBlocks[this.detectedRoom.name].forEach((block) => {
         const worldCoords = this.relativeToWorld(block);
         if (!worldCoords) return;
         this.worldBlocks.push(worldCoords);
@@ -92,7 +93,7 @@ class DungeonBreakerExtras {
   }
 
   handleNukerTick() {
-    if (!settings.enabledNuker || !this.currentRoom || !this.inDungeon || this.editMode) return;
+    if (!settings.enabledNuker || !this.detectedRoom || !this.inDungeon || this.editMode) return;
     if (Client.isInGui() && !Client.isInChat()) return;
     if (!this.worldBlocks) return;
     if (!settings.autoSwap && !Player.getHeldItem()?.getName()?.includes("Dungeonbreaker")) return;
@@ -121,10 +122,12 @@ class DungeonBreakerExtras {
       }
     });
     if (!block) return;
+
     if (!Player.getHeldItem()?.getName()?.includes("Dungeonbreaker")) {
       if (settings.autoSwap) Player.setHeldItemIndex(this.dungeonbreakerSlot);
       return;
     }
+
     this.minedBlocks.set(block.join(","), Date.now());
     this.nukeBlock(block);
   }
@@ -204,7 +207,7 @@ class DungeonBreakerExtras {
     ChatLib.chat(`&aDungeonBreakerExtras Debug Dump:`);
     ChatLib.chat(`&b  inDungeon: &7${this.inDungeon}`);
     ChatLib.chat(`&b  editMode: &7${this.editMode}`);
-    ChatLib.chat(`&b  currentRoom: &7${this.currentRoom ? "Name: " + this.currentRoom.name + ", Corner: [" + this.currentRoom.corner.join(", ") + "], Rotation: " + this.currentRoom.rotation : "null"}`);
+    ChatLib.chat(`&b  detectedRoom: &7${this.detectedRoom ? "Name: " + this.detectedRoom.name + ", Corner: [" + this.detectedRoom.corner.join(", ") + "], Rotation: " + this.detectedRoom.rotation : "null"}`);
     ChatLib.chat(`&b  worldBlocks count: &7${this.worldBlocks ? this.worldBlocks.length : 0}`);
     ChatLib.chat(`&b  minedBlocks count: &7${this.minedBlocks.size}`);
   }
@@ -217,8 +220,8 @@ class DungeonBreakerExtras {
 
   clearBlocks() {
     if (!this.inDungeon) return ChatLib.chat(`&cCannot clear blocks: Not in a dungeon.`);
-    if (!this.currentRoom || !this.currentRoom.name) return ChatLib.chat(`&cCannot clear blocks: No current room detected.`);
-    const roomName = this.currentRoom.name;
+    if (!this.detectedRoom || !this.detectedRoom.name) return ChatLib.chat(`&cCannot clear blocks: No current room detected.`);
+    const roomName = this.detectedRoom.name;
     if (this.roomBlockData.roomBlocks[roomName]) {
       delete this.roomBlockData.roomBlocks[roomName];
       ChatLib.chat(`&aCleared all blocks for room ${roomName}.`);
@@ -229,8 +232,8 @@ class DungeonBreakerExtras {
 
   listBlocks() {
     if (!this.inDungeon) return ChatLib.chat(`&cCannot list blocks: Not in a dungeon.`);
-    if (!this.currentRoom || !this.currentRoom.name) return ChatLib.chat(`&cCannot list blocks: No current room detected.`);
-    const roomName = this.currentRoom.name;
+    if (!this.detectedRoom || !this.detectedRoom.name) return ChatLib.chat(`&cCannot list blocks: No current room detected.`);
+    const roomName = this.detectedRoom.name;
     const blockList = this.roomBlockData.roomBlocks[roomName];
     if (!blockList || blockList.length === 0) {
       ChatLib.chat(`&eNo blocks stored for room ${roomName}.`);
@@ -245,13 +248,13 @@ class DungeonBreakerExtras {
   addBlockAtPosition(worldPos) {
     if (!this.editMode) return ChatLib.chat(`&cCannot add block: Edit mode is not enabled.`);
     if (!this.inDungeon) return ChatLib.chat(`&cCannot add block: Not in a dungeon.`);
-    if (!this.currentRoom || !this.currentRoom.name) return ChatLib.chat(`&cCannot add block: No current room detected.`);
+    if (!this.detectedRoom || !this.detectedRoom.name) return ChatLib.chat(`&cCannot add block: No current room detected.`);
     const relativeCoords = this.worldToRelative(worldPos);
     if (!relativeCoords) {
       ChatLib.chat(`&cFailed to calculate relative coordinates for clicked block.`);
       return;
     }
-    const roomName = this.currentRoom.name;
+    const roomName = this.detectedRoom.name;
     const blockCoords = relativeCoords.map(Math.floor);
     if (!this.roomBlockData.roomBlocks[roomName]) {
       this.roomBlockData.roomBlocks[roomName] = [];
@@ -269,13 +272,13 @@ class DungeonBreakerExtras {
   removeBlockAtPosition(worldPos) {
     if (!this.editMode) return ChatLib.chat(`&cCannot remove block: Edit mode is not enabled.`);
     if (!this.inDungeon) return ChatLib.chat(`&cCannot remove block: Not in a dungeon.`);
-    if (!this.currentRoom || !this.currentRoom.name) return ChatLib.chat(`&cCannot remove block: No current room detected.`);
+    if (!this.detectedRoom || !this.detectedRoom.name) return ChatLib.chat(`&cCannot remove block: No current room detected.`);
     const relativeCoords = this.worldToRelative(worldPos);
     if (!relativeCoords) {
       ChatLib.chat(`&cFailed to calculate relative coordinates for clicked block.`);
       return;
     }
-    const roomName = this.currentRoom.name;
+    const roomName = this.detectedRoom.name;
     if (!this.roomBlockData.roomBlocks[roomName]) return;
     const blockCoords = relativeCoords.map(Math.floor);
     const blockList = this.roomBlockData.roomBlocks[roomName];
