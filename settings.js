@@ -26,7 +26,7 @@ import {
         return subcategories.indexOf(a.getValue()[0].attributesExt.subcategory) - subcategories.indexOf(b.getValue()[0].attributesExt.subcategory);
     },
     getPropertyComparator: () => (a, b) => {
-        const names = ["Enable Visuals", "Color Picker", "Enable Nuker", "Pingless", "Global Pingless"];
+        const names = ["Enable Visuals", "Color Picker", "Enable Nuker", "Pingless", "Auto swap", "Global Pingless"];
         return names.indexOf(a.attributesExt.name) - names.indexOf(b.attributesExt.name);
     }
 })
@@ -65,6 +65,15 @@ class Settings {
         placeholder: 'Activate',
     })
     pingless = true;
+
+    @SwitchProperty({
+        name: 'Auto swap',
+        description: 'Swaps to dungeonbreaker when blocks can be nuked. (does not swap back to original item cause idk how to do that efficiently)',
+        category: 'Nuker',
+        subcategory: 'Nuker',
+        placeholder: 'Activate',
+    })
+    autoSwap = true;
 
     @SwitchProperty({
         name: 'Global Pingless',

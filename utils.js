@@ -76,3 +76,19 @@ export function relativeToWorld(relativeCoords, currentRoom) {
   const rotated = rotateCoords(relativeCoords, currentRoom.rotation);
   return [rotated[0] + currentRoom.corner[0], rotated[1] + currentRoom.corner[1], rotated[2] + currentRoom.corner[2]];
 }
+
+export function findItemInHotbar(itemName) {
+  for (let slot = 0; slot < 8; slot++) {
+    if (Player.getInventory()?.getStackInSlot(slot)?.getName()?.includes(itemName)) {
+      return slot;
+    }
+  }
+  return -1;
+}
+
+export function setItemSlot(slot) {
+  if (slot < 0 || slot > 8) return ChatLib.chat("&eDungeonbreakerextras Invalid slot blocked! Report this ASAP!");
+  if (Player.getHeldItemIndex() !== slot) {
+    Player.setHeldItemIndex(slot);
+  }
+}

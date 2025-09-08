@@ -26,6 +26,7 @@ class DungeonBreakerExtras {
     this.inDungeon = false;
     this.editMode = false;
     this.timeout = 0;
+    this.dungeonbreakerSlot = 0;
 
     this.minedBlocks = new Map();
 
@@ -94,13 +95,19 @@ class DungeonBreakerExtras {
     if (!settings.enabledNuker || !this.currentRoom || !this.inDungeon || this.editMode) return;
     if (Client.isInGui() && !Client.isInChat()) return;
     if (!this.worldBlocks) return;
-    let block = null;
-    let cost = 0;
+    if (!settings.autoSwap && !Player.getHeldItem()?.getName()?.includes("Dungeonbreaker")) return;
+
+    this.dungeonbreakerSlot = findItemInHotbar("Dungeonbreaker");
+    if (this.dungeonbreakerSlot === -1) return ChatLib.chat("&eDungeonbreakerextras Could not find dungeonbreaker in hotbar!");
+
     for (const [pos, time] of this.minedBlocks) {
       if (Date.now() - time > this.BLOCK_COOLDOWN) {
         this.minedBlocks.delete(pos);
       }
     }
+
+    let block = null;
+    let cost = 0;
     this.worldBlocks.forEach((blockCoords) => {
       if (this.minedBlocks.has(blockCoords.join(","))) return;
       if (World.getBlockAt(blockCoords[0], blockCoords[1], blockCoords[2]).type.getID() === 0) return;
@@ -115,7 +122,7 @@ class DungeonBreakerExtras {
     });
     if (!block) return;
     if (!Player.getHeldItem()?.getName()?.includes("Dungeonbreaker")) {
-      //Player.setHeldItemIndex(1);
+      if (settings.autoSwap) Player.setHeldItemIndex(this.dungeonbreakerSlot);
       return;
     }
     this.minedBlocks.set(block.join(","), Date.now());
