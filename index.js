@@ -24,6 +24,7 @@ class DungeonBreakerExtras {
     this.editMode = false;
     this.timeout = 0;
     this.dungeonbreakerSlot = 0;
+    this.warned = false
 
     this.minedBlocks = new Map();
 
@@ -92,7 +93,12 @@ class DungeonBreakerExtras {
     if (!settings.autoSwap && !Player.getHeldItem()?.getName()?.includes("Dungeonbreaker")) return;
 
     this.dungeonbreakerSlot = findItemInHotbar("Dungeonbreaker");
-    if (this.dungeonbreakerSlot === -1) return ChatLib.chat("&eDungeonbreakerextras Could not find dungeonbreaker in hotbar!");
+    if (this.dungeonbreakerSlot === -1) {
+      if (!this.warned) ChatLib.chat("&eDungeonbreakerextras Could not find dungeonbreaker in hotbar!");
+      this.warned = true
+      return;
+    } 
+    this.warned = false
 
     for (const [pos, time] of this.minedBlocks) {
       if (Date.now() - time > 1000) {
