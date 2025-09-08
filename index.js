@@ -8,7 +8,7 @@ import Location from "../tska/skyblock/Location";
 import Dungeon from "../tska/skyblock/dungeon/Dungeon";
 import PogObject from "../PogData";
 import settings from "./settings";
-import { nukeBlock, closestEnumFacing, worldToRelative, relativeToWorld, findItemInHotbar, setItemSlot } from "./utils.js";
+import { nukeBlock, worldToRelative, relativeToWorld, findItemInHotbar, setItemSlot } from "./utils.js";
 const offset = 0.01; // idk how to fix zfighting in apelles so fuck it
 const Vec3 = Java.type("net.minecraft.util.Vec3");
 const BP = Java.type("net.minecraft.util.BlockPos");
@@ -20,8 +20,6 @@ const C08PacketPlayerBlockPlacement = Java.type("net.minecraft.network.play.clie
  */
 class DungeonBreakerExtras {
   constructor() {
-    this.BLOCK_COOLDOWN = 1000;
-
     this.inDungeon = false;
     this.editMode = false;
     this.timeout = 0;
@@ -30,11 +28,6 @@ class DungeonBreakerExtras {
     this.minedBlocks = new Map();
 
     this.roomBlockData = new PogObject("DungeonBreakerExtras", { roomBlocks: {} }, "data/roomBlockData.json");
-
-    this.nukeBlock = nukeBlock;
-    this.closestEnumFacing = closestEnumFacing;
-    this.worldToRelative = (worldCoords) => worldToRelative(worldCoords, this.detectedRoom);
-    this.relativeToWorld = (relativeCoords) => relativeToWorld(relativeCoords, this.detectedRoom);
 
     register("tick", () => this.handleRoomTick());
     register("tick", () => this.handleNukerTick());
@@ -85,7 +78,7 @@ class DungeonBreakerExtras {
     this.worldBlocks = [];
     if (this.roomBlockData.roomBlocks[this.detectedRoom.name]) {
       this.roomBlockData.roomBlocks[this.detectedRoom.name].forEach((block) => {
-        const worldCoords = this.relativeToWorld(block);
+        const worldCoords = relativeToWorld(block, this.detectedRoom);
         if (!worldCoords) return;
         this.worldBlocks.push(worldCoords);
       });
@@ -102,7 +95,7 @@ class DungeonBreakerExtras {
     if (this.dungeonbreakerSlot === -1) return ChatLib.chat("&eDungeonbreakerextras Could not find dungeonbreaker in hotbar!");
 
     for (const [pos, time] of this.minedBlocks) {
-      if (Date.now() - time > this.BLOCK_COOLDOWN) {
+      if (Date.now() - time > 1000) {
         this.minedBlocks.delete(pos);
       }
     }
@@ -124,12 +117,12 @@ class DungeonBreakerExtras {
     if (!block) return;
 
     if (!Player.getHeldItem()?.getName()?.includes("Dungeonbreaker")) {
-      if (settings.autoSwap) Player.setHeldItemIndex(this.dungeonbreakerSlot);
+      if (settings.autoSwap) setItemSlot(this.dungeonbreakerSlot);
       return;
     }
 
     this.minedBlocks.set(block.join(","), Date.now());
-    this.nukeBlock(block);
+    nukeBlock(block);
   }
 
   handleRender() {
@@ -249,7 +242,7 @@ class DungeonBreakerExtras {
     if (!this.editMode) return ChatLib.chat(`&cCannot add block: Edit mode is not enabled.`);
     if (!this.inDungeon) return ChatLib.chat(`&cCannot add block: Not in a dungeon.`);
     if (!this.detectedRoom || !this.detectedRoom.name) return ChatLib.chat(`&cCannot add block: No current room detected.`);
-    const relativeCoords = this.worldToRelative(worldPos);
+    const relativeCoords = worldToRelative(worldPos, this.detectedRoom);
     if (!relativeCoords) {
       ChatLib.chat(`&cFailed to calculate relative coordinates for clicked block.`);
       return;
@@ -273,7 +266,7 @@ class DungeonBreakerExtras {
     if (!this.editMode) return ChatLib.chat(`&cCannot remove block: Edit mode is not enabled.`);
     if (!this.inDungeon) return ChatLib.chat(`&cCannot remove block: Not in a dungeon.`);
     if (!this.detectedRoom || !this.detectedRoom.name) return ChatLib.chat(`&cCannot remove block: No current room detected.`);
-    const relativeCoords = this.worldToRelative(worldPos);
+    const relativeCoords = worldToRelative(worldPos, this.detectedRoom);
     if (!relativeCoords) {
       ChatLib.chat(`&cFailed to calculate relative coordinates for clicked block.`);
       return;
