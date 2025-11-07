@@ -6,12 +6,14 @@ import settings from "./settings";
 import DungeonScanner from "../tska/skyblock/dungeon/DungeonScanner";
 import Location from "../tska/skyblock/Location";
 import Dungeon from "../tska/skyblock/dungeon/Dungeon";
+import { RoomTypes } from "../tska/skyblock/dungeon/Utils";
 import PogObject from "../PogData";
 import { nukeBlock, worldToRelative, relativeToWorld, findItemInHotbar, setItemSlot } from "./utils.js";
 const offset = 0.01; // idk how to fix zfighting in apelles so fuck it
 const Vec3 = Java.type("net.minecraft.util.Vec3");
 const BP = Java.type("net.minecraft.util.BlockPos");
 const C08PacketPlayerBlockPlacement = Java.type("net.minecraft.network.play.client.C08PacketPlayerBlockPlacement");
+const BLACKLISTED_BLOCK_IDS = new Set([7, 29, 33, 34, 36, 46, 54, 69, 77, 119, 120, 137, 144, 146, 166]);
 
 /**
  * Main class for DungeonBreakerExtras mod
@@ -99,6 +101,7 @@ class DungeonBreakerExtras {
     };
 
     if (!settings.enabledNuker || !this.detectedRoom || !this.inDungeon || this.editMode) return safeRestore();
+    if (this.isInPuzzleRoom()) return safeRestore();
     if (Client.isInGui() && !Client.isInChat()) return safeRestore();
     if (!this.worldBlocks?.length) return safeRestore();
     if (!settings.autoSwap && !this.isHoldingDungeonbreaker()) return safeRestore(true);
@@ -137,10 +140,28 @@ class DungeonBreakerExtras {
       return this.restoreAutoSlot(true);
     }
 
+    if (this.isInPuzzleRoom()) {
+      ChatLib.chat("Puzzle room key hold")
+      if (this.keyNukeActive) {
+        this.keyNukeActive = false;
+        this.restoreKeySlot();
+        this.restoreAutoSlot(true);
+      }
+      return false;
+    }
+
     if (!this.keyNukeActive) {
       this.keySwapSlot = Player.getHeldItemIndex();
       this.keyNukeActive = true;
     }
+
+    this.dungeonbreakerSlot = findItemInHotbar("Dungeonbreaker");
+    if (this.dungeonbreakerSlot === -1) {
+      if (!this.warned) ChatLib.chat("&eDungeonbreakerextras Could not find dungeonbreaker in hotbar!");
+      this.warned = true;
+      return false;
+    }
+    this.warned = false;
 
     if (Client.isInGui() && !Client.isInChat()) return false;
     if (!this.isHoldingDungeonbreaker()) {
@@ -157,8 +178,8 @@ class DungeonBreakerExtras {
     const x = target.getX();
     const y = target.getY();
     const z = target.getZ();
-    const block = World.getBlockAt(x, y, z);
-    if (!block || block.type?.getID() === 0) return false;
+    const blockState = World.getBlockAt(x, y, z);
+    if (!this.canInteractWithBlock(blockState)) return false;
 
     const coords = [x, y, z];
     if (!this.isWithinReach(coords)) return false;
@@ -179,14 +200,14 @@ class DungeonBreakerExtras {
 
   handleHitBlock(block) {
     if (!this.inDungeon || !this.isHoldingDungeonbreaker()) return;
-    const x = block.getX()
-    const y = block.getY()
-    const z = block.getZ() 
+    const x = block.getX();
+    const y = block.getY();
+    const z = block.getZ();
     if (this.editMode) {
       this.addBlockAtPosition([x, y, z]);
       return;
     }
-    if (settings.globalPingless) {
+    if (settings.globalPingless && this.canInteractWithBlock(World.getBlockAt(x, y, z))) {
       World.getWorld().func_175698_g(new BP(x, y, z)); // setBlockToAir
     }
   }
@@ -312,6 +333,7 @@ class DungeonBreakerExtras {
 
       const blockState = World.getBlockAt(coords[0], coords[1], coords[2]);
       if (!blockState || blockState.type?.getID() === 0) continue;
+      if (this.isBlacklistedBlock(blockState)) continue;
 
       const distance = this.distanceToBlock(coords, 1);
       if (distance > 5 || distance >= bestDistance) continue;
@@ -397,6 +419,22 @@ class DungeonBreakerExtras {
     } else {
       ChatLib.chat(`&eNo block found at [${blockCoords.join(", ")}]`);
     }
+  }
+
+  isInPuzzleRoom() {
+    if (!this.detectedRoom) return null;
+    return this.detectedRoom.type === RoomTypes.PUZZLE;
+  }
+
+  isBlacklistedBlock(blockState) {
+    const blockId = blockState?.type?.getID();
+    return BLACKLISTED_BLOCK_IDS.has(blockId);
+  }
+
+  canInteractWithBlock(blockState) {
+    if (!blockState || blockState.type?.getID?.() === 0) return false;
+    if (this.isInPuzzleRoom()) return false;
+    return !this.isBlacklistedBlock(blockState);
   }
 }
 
