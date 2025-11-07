@@ -2,6 +2,6 @@
   "name": "DungeonBreakerExtras",
   "creator": "rdbt",
   "entry": "index.js",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "requires": ["tska", "PogData", "Apelles"]
 }

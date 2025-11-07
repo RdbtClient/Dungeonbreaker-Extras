@@ -78,7 +78,7 @@ export function relativeToWorld(relativeCoords, currentRoom) {
 }
 
 export function findItemInHotbar(itemName) {
-  for (let slot = 0; slot < 8; slot++) {
+  for (let slot = 0; slot <= 8; slot++) {
     if (Player.getInventory()?.getStackInSlot(slot)?.getName()?.includes(itemName)) {
       return slot;
     }
